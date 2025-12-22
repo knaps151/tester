@@ -26,6 +26,8 @@ class CreateTokenRequest extends Request
             'default_content_type' => ['string'],
             'default_status' => ['int'],
             'timeout' => ['int', 'min:0', 'max:10'],
+            'expiry' => ['nullable', 'int', 'min:60'], // Minimum 1 minute
+            'max_requests' => ['nullable', 'int', 'min:1'],
         ];
     }
 }

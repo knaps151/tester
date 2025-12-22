@@ -74,6 +74,13 @@ class TokenController extends Controller
         $token->default_status = (int)$request->get('default_status', 200);
         $token->default_content_type = $request->get('default_content_type', 'text/plain');
         $token->timeout = (int)$request->get('timeout', null);
+        
+        if ($request->has('expiry')) {
+            $token->expiry = $request->get('expiry') !== null ? (int)$request->get('expiry') : null;
+        }
+        if ($request->has('max_requests')) {
+            $token->max_requests = $request->get('max_requests') !== null ? (int)$request->get('max_requests') : null;
+        }
 
         $this->tokens->store($token);
 

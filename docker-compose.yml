@@ -1,12 +1,14 @@
 services:
   webhook:
-    container_name: "webhook-site"
-    image: "webhooksite/webhook.site"
+    container_name: "tester"
+    image: "tester:custom"
     # Enable build for development:
     # build:
     #   dockerfile: Dockerfile
     #   context: ./
-    command: php artisan queue:work --daemon --tries=3 --timeout=10
+    # Note: The base image starts nginx and php-fpm automatically
+    # Uncomment the line below if you need queue worker instead:
+    # command: php artisan queue:work --daemon --tries=3 --timeout=10
     ports:
       - "8084:80"
     environment:
@@ -24,7 +26,7 @@ services:
       - redis
 
   redis:
-    container_name: "webhook-redis"
+    container_name: "tester-redis"
     image: "redis:alpine"
 
   laravel-echo-server:

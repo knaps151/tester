@@ -16,7 +16,6 @@
     <script src="js/socket.io.js"></script>
     <script src="js/libs.js"></script>
     <script src="js/bundle.js"></script>
-    <script async defer src="https://buttons.github.io/buttons.js"></script>
 
     <meta name="description"
           content="Instantly test, bin and log webhooks and HTTP requests with this handy tool that shows requests to a unique URL in realtime.">
@@ -33,23 +32,9 @@
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                 </button>
-                <a class="navbar-brand" href="/" ui-sref="home()">&#x2693;&#xFE0F; Webhook Tester</a>
+                <a class="navbar-brand" href="/" ui-sref="home()">Tester</a>
             </div>
             <div id="navbar" class="navbar-collapse collapse">
-                <div class="nav navbar-left navbar-form">
-                    <a href="https://github.com/fredsted/webhook.site" target="_blank"
-                       style="margin-top: 7px"
-                       class="btn btn-xs btn-link">
-                        Github Page</a>
-                    <a href="https://github.com/fredsted/webhook.site#donate" target="_blank"
-                       style="margin-top: 7px"
-                       class="btn btn-xs btn-link">
-                        Donate</a>
-                    <a href="https://twitter.com/fredsted" target="_blank"
-                       style="margin-top: 7px"
-                       class="btn btn-xs btn-link">
-                        @fredsted</a>
-                </div>
                 <div class="nav navbar-right navbar-form hidden-sm">&nbsp;
                     <button type="button" class="btn btn-link openModal" data-modal="#editUrlModal"
                             ga-on="click" ga-event-category="Request" ga-event-action="click-newurl">
@@ -89,9 +74,12 @@
                             <a ng-click="getPreviousPage(token.uuid)" class="prevent-default">Previous Page</a>
                         </li>
                         <li ng-repeat="(key, request) in requests.data"
-                            ng-class="{'active': currentRequestIndex === request.uuid, 'unread': unread.indexOf(request.uuid) !== -1}">
+                            ng-class="{'active': currentRequestIndex === request.uuid, 'unread': unread.indexOf(request.uuid) !== -1, 'list-group-item-danger': hasInvalidJson(request)}">
                             <a ng-click="setCurrentRequest(request)" class="select">
                                 <span class="label label-{{ getLabel(request.method) }}">{{ request.method }}</span>
+                                <span ng-show="hasInvalidJson(request)" class="label label-danger" title="Invalid JSON">
+                                    <span class="glyphicon glyphicon-exclamation-sign"></span>
+                                </span>
                                 #{{ request.uuid.substring(0,5) }} {{ request.ip }} <br/>
                                 <small>{{ localDate(request.created_at) }}</small>
                             </a>
@@ -127,7 +115,7 @@
                     <button type="button" class="close" data-dismiss="tutorial" aria-label="Close"
                             ng-click="toggleTutorial()">
                         <span aria-hidden="true">&times;</span></button>
-                    <p><strong>Webhook.site</strong>
+                    <p><strong>Tester</strong>
                         allows you to easily test webhooks and other types of HTTP requests.
                         <a href="https://simonfredsted.com/1583" target="_blank">What is a webhook?</a></p>
                     <p>Any requests sent to that URL are logged here instantly
@@ -148,12 +136,6 @@
                     <p>Bookmark this page to go back to the requests at any time.</p>
                     <p></p>Click <b>New URL</b> to create a new url with the ability to
                         customize status code, response body, etc.</p>
-                    <p>
-                        <a class="github-button" href="https://github.com/fredsted/webhook.site"
-                           data-icon="octicon-star" data-show-count="true"
-                           aria-label="Star fredsted/webhook.site on GitHub">Star on GitHub</a>
-                        <a href="https://github.com/fredsted/webhook.site"
-                    </p>
                 </div>
                 <div ng-show="hasRequests">
                     <div class="container-fluid">
@@ -344,10 +326,15 @@
                                 <p id="noContent" ng-show="hasRequests && currentRequest.content == ''">
                                     (no body content)</p>
 
-                                <div id="req-content"
-                                     ng-show="hasRequests && currentRequest.content != ''"
-                                     hljs 
-                                     hljs-source="formatJsonEnable ? formatContent(currentRequest.content) : currentRequest.content">
+                                <div ng-show="hasRequests && currentRequest.content != ''">
+                                    <div ng-show="hasInvalidJson(currentRequest)" class="alert alert-danger" style="margin-bottom: 10px;">
+                                        <strong><span class="glyphicon glyphicon-exclamation-sign"></span> Invalid JSON:</strong> 
+                                        {{ getJsonValidationError(currentRequest.content) }}
+                                    </div>
+                                    <div id="req-content"
+                                         hljs 
+                                         hljs-source="formatJsonEnable ? formatContent(currentRequest.content) : currentRequest.content">
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -448,6 +435,25 @@
                     <form class="form-horizontal" id="editTokenForm">
                         <fieldset>
 
+                            <!-- Template dropdown-->
+                            <div class="form-group">
+                                <label class="col-md-4 control-label" for="edit_response_template">Response Template</label>
+                                <div class="col-md-6">
+                                    <select id="edit_response_template" name="edit_response_template" class="form-control" ng-model="selectedEditTemplate" ng-change="applyEditTemplate()">
+                                        <option value="">-- Custom (Manual Entry) --</option>
+                                        <option value="json_success">JSON Success (200)</option>
+                                        <option value="json_error">JSON Error (400)</option>
+                                        <option value="json_created">JSON Created (201)</option>
+                                        <option value="json_not_found">JSON Not Found (404)</option>
+                                        <option value="xml_response">XML Response (200)</option>
+                                        <option value="plain_success">Plain Text Success (200)</option>
+                                        <option value="plain_error">Plain Text Error (500)</option>
+                                        <option value="empty_response">Empty Response (204)</option>
+                                        <option value="html_response">HTML Response (200)</option>
+                                    </select>
+                                </div>
+                            </div>
+
                             <!-- Text input-->
                             <div class="form-group">
                                 <label class="col-md-4 control-label" for="default_status">Default status code</label>
@@ -475,6 +481,28 @@
                                     <input id="timeout" name="timeout" type="number" max="10" min="0" placeholder="0"
                                            value="0" class="form-control input-md"
                                            ng-model="token.timeout">
+                                </div>
+                            </div>
+
+                            <!-- Text input-->
+                            <div class="form-group">
+                                <label class="col-md-4 control-label" for="expiry">Data Retention (seconds)</label>
+                                <div class="col-md-4">
+                                    <input id="expiry" name="expiry" type="number" min="60" placeholder="604800 (7 days)"
+                                           class="form-control input-md" ng-model="token.expiry"
+                                           title="Time in seconds before data expires. Default: 604800 (7 days)">
+                                    <small class="help-block">Leave empty for default (7 days)</small>
+                                </div>
+                            </div>
+
+                            <!-- Text input-->
+                            <div class="form-group">
+                                <label class="col-md-4 control-label" for="max_requests">Max Requests</label>
+                                <div class="col-md-4">
+                                    <input id="max_requests" name="max_requests" type="number" min="1" placeholder="500"
+                                           class="form-control input-md" ng-model="token.max_requests"
+                                           title="Maximum number of requests before URL becomes unavailable">
+                                    <small class="help-block">Leave empty for default (500)</small>
                                 </div>
                             </div>
 
@@ -523,6 +551,25 @@
                     <form class="form-horizontal" id="createTokenForm">
                         <fieldset>
 
+                            <!-- Template dropdown-->
+                            <div class="form-group">
+                                <label class="col-md-4 control-label" for="response_template">Response Template</label>
+                                <div class="col-md-6">
+                                    <select id="response_template" name="response_template" class="form-control" ng-model="selectedTemplate" ng-change="applyTemplate()">
+                                        <option value="">-- Custom (Manual Entry) --</option>
+                                        <option value="json_success">JSON Success (200)</option>
+                                        <option value="json_error">JSON Error (400)</option>
+                                        <option value="json_created">JSON Created (201)</option>
+                                        <option value="json_not_found">JSON Not Found (404)</option>
+                                        <option value="xml_response">XML Response (200)</option>
+                                        <option value="plain_success">Plain Text Success (200)</option>
+                                        <option value="plain_error">Plain Text Error (500)</option>
+                                        <option value="empty_response">Empty Response (204)</option>
+                                        <option value="html_response">HTML Response (200)</option>
+                                    </select>
+                                </div>
+                            </div>
+
                             <!-- Text input-->
                             <div class="form-group">
                                 <label class="col-md-4 control-label" for="default_status">Default status code</label>
@@ -548,6 +595,26 @@
                                 <div class="col-md-4">
                                     <input id="timeout" name="timeout" type="number" max="10" min="0" placeholder="0"
                                            value="0" class="form-control input-md">
+                                </div>
+                            </div>
+
+                            <!-- Text input-->
+                            <div class="form-group">
+                                <label class="col-md-4 control-label" for="expiry">Data Retention (seconds)</label>
+                                <div class="col-md-4">
+                                    <input id="expiry" name="expiry" type="number" min="60" placeholder="604800 (7 days)"
+                                           class="form-control input-md" title="Time in seconds before data expires. Default: 604800 (7 days)">
+                                    <small class="help-block">Leave empty for default (7 days)</small>
+                                </div>
+                            </div>
+
+                            <!-- Text input-->
+                            <div class="form-group">
+                                <label class="col-md-4 control-label" for="max_requests">Max Requests</label>
+                                <div class="col-md-4">
+                                    <input id="max_requests" name="max_requests" type="number" min="1" placeholder="500"
+                                           class="form-control input-md" title="Maximum number of requests before URL becomes unavailable">
+                                    <small class="help-block">Leave empty for default (500)</small>
                                 </div>
                             </div>
 

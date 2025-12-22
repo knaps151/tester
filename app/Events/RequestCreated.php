@@ -6,9 +6,9 @@ use App\Storage\Request;
 use App\Storage\Token;
 use App\Storage\TokenStore;
 use Illuminate\Broadcasting\Channel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 
-class RequestCreated implements ShouldBroadcast
+class RequestCreated implements ShouldBroadcastNow
 {
     /**
      * @var Request

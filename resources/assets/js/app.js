@@ -122,9 +122,27 @@ angular
         // Hack to open modals inside that are nested inside divs
         // Since the modals need to be placed inside the ui-view div
         $('.openModal').click(function (e) {
-            $($(this).data('modal')).modal();
+            var modalId = $(this).data('modal');
+            $(modalId).modal();
             $('.modal-backdrop').appendTo('.mainView');
             $('body').removeClass();
+            
+            // Reset form when opening new URL modal
+            if (modalId === '#newUrlModal') {
+                $scope.selectedTemplate = '';
+                $('#createTokenForm')[0].reset();
+                $('#default_status').val('');
+                $('#default_content_type').val('');
+                $('#default_content').val('');
+                $('#timeout').val('0');
+                $scope.$apply();
+            }
+            
+            // Reset template selection when opening edit modal
+            if (modalId === '#editUrlModal') {
+                $scope.selectedEditTemplate = '';
+                $scope.$apply();
+            }
         });
 
         // Automatically save settings
@@ -168,9 +186,9 @@ angular
 
         $scope.updateUnreadCount = (function () {
             if ($scope.unread.length > 0) {
-                document.title = '(' + $scope.unread.length + ') Webhook.site';
+                document.title = '(' + $scope.unread.length + ') Tester';
             } else {
-                document.title = 'Webhook.site';
+                document.title = 'Tester';
             }
 
             window.localStorage.setItem(
@@ -347,7 +365,7 @@ angular
                         'log': {
                             'version': '1.2',
                             'creator': {
-                                'name': 'Webhook.site',
+                                'name': 'Tester',
                                 'version': '1.0',
                             },
                             'entries': [{
@@ -422,12 +440,141 @@ angular
             }
         });
 
+        // Template responses
+        $scope.responseTemplates = {
+            'json_success': {
+                status: '200',
+                contentType: 'application/json',
+                content: '{"status": "success", "message": "Request received"}'
+            },
+            'json_error': {
+                status: '400',
+                contentType: 'application/json',
+                content: '{"error": "Bad Request", "message": "Invalid request"}'
+            },
+            'json_created': {
+                status: '201',
+                contentType: 'application/json',
+                content: '{"status": "created", "message": "Resource created successfully"}'
+            },
+            'json_not_found': {
+                status: '404',
+                contentType: 'application/json',
+                content: '{"error": "Not Found", "message": "Resource not found"}'
+            },
+            'xml_response': {
+                status: '200',
+                contentType: 'application/xml',
+                content: '<?xml version="1.0" encoding="UTF-8"?>\n<response>\n  <status>success</status>\n  <message>Request received</message>\n</response>'
+            },
+            'plain_success': {
+                status: '200',
+                contentType: 'text/plain',
+                content: 'OK'
+            },
+            'plain_error': {
+                status: '500',
+                contentType: 'text/plain',
+                content: 'Internal Server Error'
+            },
+            'empty_response': {
+                status: '204',
+                contentType: 'text/plain',
+                content: ''
+            },
+            'html_response': {
+                status: '200',
+                contentType: 'text/html',
+                content: '<!DOCTYPE html>\n<html>\n<head><title>Success</title></head>\n<body><h1>Request Received</h1><p>Your request was successfully processed.</p></body>\n</html>'
+            }
+        };
+
+        $scope.applyTemplate = (function () {
+            if (!$scope.selectedTemplate || $scope.selectedTemplate === '') {
+                // Clear fields if template is deselected
+                var statusField = document.getElementById('default_status');
+                var contentTypeField = document.getElementById('default_content_type');
+                var contentField = document.getElementById('default_content');
+                if (statusField) statusField.value = '';
+                if (contentTypeField) contentTypeField.value = '';
+                if (contentField) contentField.value = '';
+                return;
+            }
+
+            var template = $scope.responseTemplates[$scope.selectedTemplate];
+            if (template) {
+                // Use $timeout to ensure DOM is ready
+                $timeout(function() {
+                    var statusField = document.getElementById('default_status');
+                    var contentTypeField = document.getElementById('default_content_type');
+                    var contentField = document.getElementById('default_content');
+                    
+                    if (statusField) {
+                        statusField.value = template.status;
+                        // Trigger change event for jQuery serialization
+                        $(statusField).trigger('change').trigger('input');
+                    }
+                    if (contentTypeField) {
+                        contentTypeField.value = template.contentType;
+                        $(contentTypeField).trigger('change').trigger('input');
+                    }
+                    if (contentField) {
+                        contentField.value = template.content;
+                        $(contentField).trigger('change').trigger('input');
+                    }
+                }, 100);
+            }
+        });
+
+        $scope.applyEditTemplate = (function () {
+            if (!$scope.selectedEditTemplate || $scope.selectedEditTemplate === '') {
+                return;
+            }
+
+            var template = $scope.responseTemplates[$scope.selectedEditTemplate];
+            if (template && $scope.token) {
+                $scope.token.default_status = template.status;
+                $scope.token.default_content_type = template.contentType;
+                $scope.token.default_content = template.content;
+                $scope.$apply();
+            }
+        });
+
         $scope.getCustomToken = (function () {
             var formData = {};
+            
+            // Get form values directly from DOM elements to ensure we capture template values
+            var statusField = document.getElementById('default_status');
+            var contentTypeField = document.getElementById('default_content_type');
+            var contentField = document.getElementById('default_content');
+            var timeoutField = document.getElementById('timeout');
+            var expiryField = document.getElementById('expiry');
+            var maxRequestsField = document.getElementById('max_requests');
+            
+            if (statusField && statusField.value) {
+                formData.default_status = statusField.value;
+            }
+            if (contentTypeField && contentTypeField.value) {
+                formData.default_content_type = contentTypeField.value;
+            }
+            if (contentField) {
+                formData.default_content = contentField.value;
+            }
+            if (timeoutField && timeoutField.value) {
+                formData.timeout = timeoutField.value;
+            }
+            if (expiryField && expiryField.value) {
+                formData.expiry = expiryField.value;
+            }
+            if (maxRequestsField && maxRequestsField.value) {
+                formData.max_requests = maxRequestsField.value;
+            }
+            
+            // Also use serializeArray as fallback for any other fields
             $('#createTokenForm')
                 .serializeArray()
                 .map(function (value) {
-                    if (value.value != '') {
+                    if (value.value != '' && value.name !== 'response_template') {
                         formData[value.name] = value.value;
                     }
                 });
@@ -606,6 +753,41 @@ angular
                 return false;
             }
             return true;
+        };
+
+        // Check if content-type indicates JSON
+        $scope.isJsonContentType = function (request) {
+            if (!request || !request.headers) {
+                return false;
+            }
+            var contentType = '';
+            if (request.headers['content-type'] && request.headers['content-type'].length > 0) {
+                contentType = request.headers['content-type'][0].toLowerCase();
+            }
+            return contentType.indexOf('application/json') !== -1 || 
+                   contentType.indexOf('application/vnd.api+json') !== -1 ||
+                   contentType.indexOf('+json') !== -1;
+        };
+
+        // Get JSON validation error message
+        $scope.getJsonValidationError = function (content) {
+            if (!content || content === '') {
+                return null;
+            }
+            try {
+                JSON.parse(content);
+                return null; // Valid JSON
+            } catch (e) {
+                return e.message || 'Invalid JSON';
+            }
+        };
+
+        // Check if request has invalid JSON
+        $scope.hasInvalidJson = function (request) {
+            if (!request || !request.content) {
+                return false;
+            }
+            return $scope.isJsonContentType(request) && !$scope.isValidJSON(request.content);
         };
 
         $scope.formatContentJson = function (content) {

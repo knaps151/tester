@@ -11,7 +11,7 @@
     <div class="jumbotron">
         <h1>Error</h1>
         <p class="lead">{{ $exception->getMessage() }}</p>
-        <p><a class="btn btn-lg btn-success" href="/" role="button">Back to webhook.site &rarr;</a></p>
+        <p><a class="btn btn-lg btn-success" href="/" role="button">Back to Tester &rarr;</a></p>
     </div>
 </div>
 </body>
