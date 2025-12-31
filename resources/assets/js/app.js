@@ -143,6 +143,12 @@ angular
                 $scope.selectedEditTemplate = '';
                 $scope.$apply();
             }
+            
+            // Reset template builder form when opening template builder modal
+            if (modalId === '#templateBuilderModal') {
+                $scope.cancelEditTemplate();
+                $scope.$apply();
+            }
         });
 
         // Automatically save settings
@@ -440,93 +446,346 @@ angular
             }
         });
 
-        // Template responses
-        $scope.responseTemplates = {
+        // Default template responses (built-in)
+        var defaultTemplates = {
             'json_success': {
                 status: '200',
                 contentType: 'application/json',
-                content: '{"status": "success", "message": "Request received"}'
+                content: '{"status": "success", "message": "Request received"}',
+                builtIn: true
             },
             'json_error': {
                 status: '400',
                 contentType: 'application/json',
-                content: '{"error": "Bad Request", "message": "Invalid request"}'
+                content: '{"error": "Bad Request", "message": "Invalid request"}',
+                builtIn: true
             },
             'json_created': {
                 status: '201',
                 contentType: 'application/json',
-                content: '{"status": "created", "message": "Resource created successfully"}'
+                content: '{"status": "created", "message": "Resource created successfully"}',
+                builtIn: true
             },
             'json_not_found': {
                 status: '404',
                 contentType: 'application/json',
-                content: '{"error": "Not Found", "message": "Resource not found"}'
+                content: '{"error": "Not Found", "message": "Resource not found"}',
+                builtIn: true
             },
             'xml_response': {
                 status: '200',
                 contentType: 'application/xml',
-                content: '<?xml version="1.0" encoding="UTF-8"?>\n<response>\n  <status>success</status>\n  <message>Request received</message>\n</response>'
+                content: '<?xml version="1.0" encoding="UTF-8"?>\n<response>\n  <status>success</status>\n  <message>Request received</message>\n</response>',
+                builtIn: true
             },
             'plain_success': {
                 status: '200',
                 contentType: 'text/plain',
-                content: 'OK'
+                content: 'OK',
+                builtIn: true
             },
             'plain_error': {
                 status: '500',
                 contentType: 'text/plain',
-                content: 'Internal Server Error'
+                content: 'Internal Server Error',
+                builtIn: true
             },
             'empty_response': {
                 status: '204',
                 contentType: 'text/plain',
-                content: ''
+                content: '',
+                builtIn: true
             },
             'html_response': {
                 status: '200',
                 contentType: 'text/html',
-                content: '<!DOCTYPE html>\n<html>\n<head><title>Success</title></head>\n<body><h1>Request Received</h1><p>Your request was successfully processed.</p></body>\n</html>'
+                content: '<!DOCTYPE html>\n<html>\n<head><title>Success</title></head>\n<body><h1>Request Received</h1><p>Your request was successfully processed.</p></body>\n</html>',
+                builtIn: true
             }
         };
 
-        $scope.applyTemplate = (function () {
+        /**
+         * Template management functions
+         */
+        var TEMPLATE_STORAGE_KEY = 'customResponseTemplates';
+
+        var loadCustomTemplates = function() {
+            var stored = $scope.getSetting(TEMPLATE_STORAGE_KEY, {});
+            return stored || {};
+        };
+
+        var saveCustomTemplates = function(templates) {
+            window.localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(templates));
+        };
+
+        var getAllTemplates = function() {
+            var customTemplates = loadCustomTemplates();
+            return angular.extend({}, defaultTemplates, customTemplates);
+        };
+
+        // Initialize response templates
+        $scope.responseTemplates = getAllTemplates();
+        $scope.customTemplates = loadCustomTemplates();
+
+        /**
+         * Template builder functions
+         */
+        $scope.templateBuilder = {
+            editing: null,
+            form: {
+                name: '',
+                status: '200',
+                contentType: 'application/json',
+                content: ''
+            }
+        };
+
+        $scope.saveTemplate = function() {
+            if (!$scope.templateBuilder.form.name || $scope.templateBuilder.form.name.trim() === '') {
+                $.notify('Template name is required');
+                return;
+            }
+
+            var templateKey;
+            var customTemplates = loadCustomTemplates();
+            
+            if ($scope.templateBuilder.editing) {
+                // Editing existing template - use existing key
+                templateKey = $scope.templateBuilder.editing;
+            } else {
+                // Creating new template - generate key from name
+                templateKey = $scope.templateBuilder.form.name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+                
+                // Ensure key is not empty
+                if (!templateKey || templateKey.trim() === '') {
+                    $.notify('Invalid template name. Please use alphanumeric characters.');
+                    return;
+                }
+                
+                // Check if it's a built-in template
+                if (defaultTemplates[templateKey]) {
+                    $.notify('Cannot overwrite built-in templates. Please use a different name.');
+                    return;
+                }
+                
+                // Check if key already exists
+                if (customTemplates[templateKey]) {
+                    $.notify('A template with this name already exists. Please use a different name.');
+                    return;
+                }
+            }
+
+            customTemplates[templateKey] = {
+                status: String($scope.templateBuilder.form.status || '200'),
+                contentType: String($scope.templateBuilder.form.contentType || 'application/json'),
+                content: String($scope.templateBuilder.form.content || ''),
+                builtIn: false,
+                name: String($scope.templateBuilder.form.name || templateKey)
+            };
+
+            try {
+                saveCustomTemplates(customTemplates);
+                
+                // Force Angular to detect changes
+                $scope.$apply(function() {
+                    $scope.customTemplates = loadCustomTemplates();
+                    $scope.responseTemplates = getAllTemplates();
+                });
+                
+                $scope.templateBuilder.form = {
+                    name: '',
+                    status: '200',
+                    contentType: 'application/json',
+                    content: ''
+                };
+                $scope.templateBuilder.editing = null;
+                
+                $.notify('Template saved successfully!');
+            } catch (e) {
+                console.error('Error saving template:', e);
+                $.notify('Error saving template: ' + e.message);
+            }
+        };
+
+        $scope.editTemplate = function(templateKey) {
+            var template = $scope.responseTemplates[templateKey];
+            if (template && !template.builtIn) {
+                $scope.templateBuilder.editing = templateKey;
+                $scope.templateBuilder.form = {
+                    name: template.name || templateKey,
+                    status: template.status,
+                    contentType: template.contentType,
+                    content: template.content
+                };
+            }
+        };
+
+        $scope.deleteTemplate = function(templateKey) {
+            if (defaultTemplates[templateKey]) {
+                $.notify('Cannot delete built-in templates');
+                return;
+            }
+
+            if (confirm('Are you sure you want to delete this template?')) {
+                var customTemplates = loadCustomTemplates();
+                delete customTemplates[templateKey];
+                saveCustomTemplates(customTemplates);
+                
+                // Force Angular to detect changes
+                $scope.$apply(function() {
+                    $scope.customTemplates = loadCustomTemplates();
+                    $scope.responseTemplates = getAllTemplates();
+                });
+                
+                $.notify('Template deleted');
+            }
+        };
+
+        $scope.cancelEditTemplate = function() {
+            $scope.templateBuilder.form = {
+                name: '',
+                status: '200',
+                contentType: 'application/json',
+                content: ''
+            };
+            $scope.templateBuilder.editing = null;
+        };
+
+        /**
+         * Migrate built-in templates to custom templates
+         */
+        $scope.migrateBuiltInTemplates = function() {
+            if (!confirm('This will copy all built-in templates to your custom templates. You can then edit them. Continue?')) {
+                return;
+            }
+
+            var customTemplates = loadCustomTemplates();
+            var migrated = 0;
+            var skipped = 0;
+
+            Object.keys(defaultTemplates).forEach(function(key) {
+                var template = defaultTemplates[key];
+                
+                // Only migrate if not already exists
+                if (!customTemplates[key]) {
+                    customTemplates[key] = {
+                        status: template.status,
+                        contentType: template.contentType,
+                        content: template.content,
+                        builtIn: false,
+                        name: template.name || key.replace(/_/g, ' ').replace(/\b\w/g, function(l){return l.toUpperCase()})
+                    };
+                    migrated++;
+                } else {
+                    skipped++;
+                }
+            });
+
+            saveCustomTemplates(customTemplates);
+            
+            // Force Angular to detect changes
+            $scope.$apply(function() {
+                $scope.customTemplates = loadCustomTemplates();
+                $scope.responseTemplates = getAllTemplates();
+            });
+
+            var message = 'Migration complete! ' + migrated + ' template(s) migrated.';
+            if (skipped > 0) {
+                message += ' ' + skipped + ' template(s) already existed and were skipped.';
+            }
+            $.notify(message, { delay: 5000 });
+        };
+
+        /**
+         * Migrate a single built-in template to custom
+         */
+        $scope.migrateSingleTemplate = function(templateKey) {
+            if (!defaultTemplates[templateKey]) {
+                $.notify('Template not found');
+                return;
+            }
+
+            var customTemplates = loadCustomTemplates();
+            
+            if (customTemplates[templateKey]) {
+                if (!confirm('A custom template with this name already exists. Overwrite it?')) {
+                    return;
+                }
+            }
+
+            var template = defaultTemplates[templateKey];
+            customTemplates[templateKey] = {
+                status: template.status,
+                contentType: template.contentType,
+                content: template.content,
+                builtIn: false,
+                name: template.name || templateKey.replace(/_/g, ' ').replace(/\b\w/g, function(l){return l.toUpperCase()})
+            };
+
+            saveCustomTemplates(customTemplates);
+            
+            // Force Angular to detect changes
+            $scope.$apply(function() {
+                $scope.customTemplates = loadCustomTemplates();
+                $scope.responseTemplates = getAllTemplates();
+            });
+            
+            $.notify('Template migrated successfully! You can now edit it.');
+        };
+
+        /**
+         * Helper function to get form field by ID
+         */
+        var getFormField = function(fieldId) {
+            return document.getElementById(fieldId);
+        };
+
+        /**
+         * Helper function to set form field value and trigger events
+         */
+        var setFormFieldValue = function(fieldId, value) {
+            var field = getFormField(fieldId);
+            if (field) {
+                field.value = value;
+                $(field).trigger('change').trigger('input');
+            }
+        };
+
+        /**
+         * Helper function to clear form fields
+         */
+        var clearFormFields = function(fieldIds) {
+            fieldIds.forEach(function(fieldId) {
+                var field = getFormField(fieldId);
+                if (field) {
+                    field.value = '';
+                }
+            });
+        };
+
+        /**
+         * Apply template values to create form fields
+         */
+        $scope.applyTemplate = function() {
             if (!$scope.selectedTemplate || $scope.selectedTemplate === '') {
-                // Clear fields if template is deselected
-                var statusField = document.getElementById('default_status');
-                var contentTypeField = document.getElementById('default_content_type');
-                var contentField = document.getElementById('default_content');
-                if (statusField) statusField.value = '';
-                if (contentTypeField) contentTypeField.value = '';
-                if (contentField) contentField.value = '';
+                clearFormFields(['default_status', 'default_content_type', 'default_content']);
                 return;
             }
 
             var template = $scope.responseTemplates[$scope.selectedTemplate];
             if (template) {
-                // Use $timeout to ensure DOM is ready
                 $timeout(function() {
-                    var statusField = document.getElementById('default_status');
-                    var contentTypeField = document.getElementById('default_content_type');
-                    var contentField = document.getElementById('default_content');
-                    
-                    if (statusField) {
-                        statusField.value = template.status;
-                        // Trigger change event for jQuery serialization
-                        $(statusField).trigger('change').trigger('input');
-                    }
-                    if (contentTypeField) {
-                        contentTypeField.value = template.contentType;
-                        $(contentTypeField).trigger('change').trigger('input');
-                    }
-                    if (contentField) {
-                        contentField.value = template.content;
-                        $(contentField).trigger('change').trigger('input');
-                    }
+                    setFormFieldValue('default_status', template.status);
+                    setFormFieldValue('default_content_type', template.contentType);
+                    setFormFieldValue('default_content', template.content);
                 }, 100);
             }
-        });
+        };
 
-        $scope.applyEditTemplate = (function () {
+        /**
+         * Apply template values to edit form (uses Angular model binding)
+         */
+        $scope.applyEditTemplate = function() {
             if (!$scope.selectedEditTemplate || $scope.selectedEditTemplate === '') {
                 return;
             }
@@ -538,44 +797,45 @@ angular
                 $scope.token.default_content = template.content;
                 $scope.$apply();
             }
-        });
+        };
 
-        $scope.getCustomToken = (function () {
+        /**
+         * Helper function to get form field value
+         */
+        var getFormFieldValue = function(fieldId) {
+            var field = getFormField(fieldId);
+            return field && field.value ? field.value : null;
+        };
+
+        /**
+         * Collect form data from create token form
+         */
+        $scope.getCustomToken = function() {
             var formData = {};
             
             // Get form values directly from DOM elements to ensure we capture template values
-            var statusField = document.getElementById('default_status');
-            var contentTypeField = document.getElementById('default_content_type');
-            var contentField = document.getElementById('default_content');
-            var timeoutField = document.getElementById('timeout');
-            var expiryField = document.getElementById('expiry');
-            var maxRequestsField = document.getElementById('max_requests');
+            var fieldMappings = {
+                'default_status': 'default_status',
+                'default_content_type': 'default_content_type',
+                'default_content': 'default_content',
+                'timeout': 'timeout',
+                'expiry': 'expiry',
+                'max_requests': 'max_requests'
+            };
             
-            if (statusField && statusField.value) {
-                formData.default_status = statusField.value;
-            }
-            if (contentTypeField && contentTypeField.value) {
-                formData.default_content_type = contentTypeField.value;
-            }
-            if (contentField) {
-                formData.default_content = contentField.value;
-            }
-            if (timeoutField && timeoutField.value) {
-                formData.timeout = timeoutField.value;
-            }
-            if (expiryField && expiryField.value) {
-                formData.expiry = expiryField.value;
-            }
-            if (maxRequestsField && maxRequestsField.value) {
-                formData.max_requests = maxRequestsField.value;
-            }
+            Object.keys(fieldMappings).forEach(function(fieldId) {
+                var value = getFormFieldValue(fieldId);
+                if (value !== null && value !== '') {
+                    formData[fieldMappings[fieldId]] = value;
+                }
+            });
             
             // Also use serializeArray as fallback for any other fields
             $('#createTokenForm')
                 .serializeArray()
-                .map(function (value) {
-                    if (value.value != '' && value.name !== 'response_template') {
-                        formData[value.name] = value.value;
+                .forEach(function (item) {
+                    if (item.value !== '' && item.name !== 'response_template') {
+                        formData[item.name] = item.value;
                     }
                 });
 
@@ -584,30 +844,34 @@ angular
                     $state.go('token', { id: response.data.uuid });
                     $scope.resetUnread();
                     $.notify('New URL created');
-                }, function (response) {
-                    if (response.status === 422) {
-                        let errors = [];
-                        for (let error in response.data) {
-                            if (response.data.hasOwnProperty(error)) {
-                                errors.push(response.data[error]);
-                            }
-                        }
-                        $.notify('Error creating token:<br>' + errors.join(', '), { delay: 10000 });
-                        return;
+                })
+                .catch(function (response) {
+                    var errorMessage = 'Error creating token';
+                    if (response.status === 422 && response.data) {
+                        var errors = Object.keys(response.data).map(function(key) {
+                            return Array.isArray(response.data[key]) 
+                                ? response.data[key].join(', ')
+                                : response.data[key];
+                        });
+                        errorMessage += ':<br>' + errors.join(', ');
+                        $.notify(errorMessage, { delay: 10000 });
+                    } else {
+                        $.notify(errorMessage + ' (' + (response.status || 'unknown') + ')');
                     }
-
-                    $.notify('Error creating token (' + response.status + ')');
                 });
-        });
+        };
 
-        $scope.editToken = (function (tokenId) {
+        /**
+         * Update token with form data
+         */
+        $scope.editToken = function(tokenId) {
             var formData = {};
 
             $('#editTokenForm')
                 .serializeArray()
-                .map(function (value) {
-                    if (value.value !== '') {
-                        formData[value.name] = value.value;
+                .forEach(function (item) {
+                    if (item.value !== '') {
+                        formData[item.name] = item.value;
                     }
                 });
 
@@ -615,8 +879,11 @@ angular
                 .then(function (response) {
                     $scope.token = response.data;
                     $.notify('URL updated!');
+                })
+                .catch(function (response) {
+                    $.notify('Error updating token (' + response.status + ')');
                 });
-        });
+        };
 
         $scope.toggleCors = (function (token) {
             $http.put('token/' + token.uuid + '/cors/toggle')

@@ -18,7 +18,7 @@ class RequestStore implements \App\Storage\RequestStore
     private $redis;
 
     /**
-     * TokenStore constructor.
+     * RequestStore constructor.
      */
     public function __construct()
     {
@@ -38,11 +38,7 @@ class RequestStore implements \App\Storage\RequestStore
             throw new NotFoundHttpException('Request not found');
         }
 
-        $expiry = isset($token->expiry) && $token->expiry !== null 
-            ? $token->expiry 
-            : config('app.expiry');
-        
-        $this->redis->expire(Request::getIdentifier($token->uuid), $expiry);
+        $this->redis->expire(Request::getIdentifier($token->uuid), $token->getExpiry());
 
         return new Request(json_decode($result, true));
     }
@@ -98,11 +94,7 @@ class RequestStore implements \App\Storage\RequestStore
                 json_encode($request->attributes())
             );
 
-        $expiry = isset($token->expiry) && $token->expiry !== null 
-            ? $token->expiry 
-            : config('app.expiry');
-        
-        $this->redis->expire(Request::getIdentifier($token->uuid), $expiry);
+        $this->redis->expire(Request::getIdentifier($token->uuid), $token->getExpiry());
 
         return $result;
     }

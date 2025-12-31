@@ -53,6 +53,10 @@
                             ga-on="click" ga-event-category="Request" ga-event-action="click-editurl">
                         <span class="glyphicon glyphicon-plus"></span> New
                     </button>
+                    <button type="button" class="btn btn-info openModal" data-modal="#templateBuilderModal"
+                            ga-on="click" ga-event-category="Template" ga-event-action="open-builder">
+                        <span class="glyphicon glyphicon-cog"></span> Templates
+                    </button>
 
                 </div>
             </div>
@@ -441,15 +445,18 @@
                                 <div class="col-md-6">
                                     <select id="edit_response_template" name="edit_response_template" class="form-control" ng-model="selectedEditTemplate" ng-change="applyEditTemplate()">
                                         <option value="">-- Custom (Manual Entry) --</option>
-                                        <option value="json_success">JSON Success (200)</option>
-                                        <option value="json_error">JSON Error (400)</option>
-                                        <option value="json_created">JSON Created (201)</option>
-                                        <option value="json_not_found">JSON Not Found (404)</option>
-                                        <option value="xml_response">XML Response (200)</option>
-                                        <option value="plain_success">Plain Text Success (200)</option>
-                                        <option value="plain_error">Plain Text Error (500)</option>
-                                        <option value="empty_response">Empty Response (204)</option>
-                                        <option value="html_response">HTML Response (200)</option>
+                                        <optgroup label="Built-in Templates">
+                                            <option ng-repeat="(key, template) in responseTemplates" 
+                                                    ng-if="template.builtIn" 
+                                                    value="{{ key }}">
+                                                {{ template.name || (key.replace(/_/g, ' ').replace(/\b\w/g, function(l){return l.toUpperCase()})) }} ({{ template.status }})
+                                            </option>
+                                        </optgroup>
+                                        <optgroup label="Custom Templates" ng-if="Object.keys(customTemplates).length > 0">
+                                            <option ng-repeat="(key, template) in customTemplates" value="{{ key }}">
+                                                {{ template.name || (key.replace(/_/g, ' ').replace(/\b\w/g, function(l){return l.toUpperCase()})) }} ({{ template.status }})
+                                            </option>
+                                        </optgroup>
                                     </select>
                                 </div>
                             </div>
@@ -557,15 +564,18 @@
                                 <div class="col-md-6">
                                     <select id="response_template" name="response_template" class="form-control" ng-model="selectedTemplate" ng-change="applyTemplate()">
                                         <option value="">-- Custom (Manual Entry) --</option>
-                                        <option value="json_success">JSON Success (200)</option>
-                                        <option value="json_error">JSON Error (400)</option>
-                                        <option value="json_created">JSON Created (201)</option>
-                                        <option value="json_not_found">JSON Not Found (404)</option>
-                                        <option value="xml_response">XML Response (200)</option>
-                                        <option value="plain_success">Plain Text Success (200)</option>
-                                        <option value="plain_error">Plain Text Error (500)</option>
-                                        <option value="empty_response">Empty Response (204)</option>
-                                        <option value="html_response">HTML Response (200)</option>
+                                        <optgroup label="Built-in Templates">
+                                            <option ng-repeat="(key, template) in responseTemplates" 
+                                                    ng-if="template.builtIn" 
+                                                    value="{{ key }}">
+                                                {{ template.name || (key.replace(/_/g, ' ').replace(/\b\w/g, function(l){return l.toUpperCase()})) }} ({{ template.status }})
+                                            </option>
+                                        </optgroup>
+                                        <optgroup label="Custom Templates" ng-if="Object.keys(customTemplates).length > 0">
+                                            <option ng-repeat="(key, template) in customTemplates" value="{{ key }}">
+                                                {{ template.name || (key.replace(/_/g, ' ').replace(/\b\w/g, function(l){return l.toUpperCase()})) }} ({{ template.status }})
+                                            </option>
+                                        </optgroup>
                                     </select>
                                 </div>
                             </div>
@@ -636,6 +646,147 @@
                             ga-on="click" ga-event-category="Request" ga-event-action="create">
                         Create
                     </button>
+                </div>
+            </div><!-- /.modal-content -->
+        </div><!-- /.modal-dialog -->
+    </div><!-- /.modal -->
+
+    <!-- Template Builder Modal -->
+    <div class="modal fade" tabindex="-1" role="dialog" id="templateBuilderModal">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title">
+                        <span class="glyphicon glyphicon-cog"></span> Template Builder
+                    </h4>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Create/Edit Template</h5>
+                            <form class="form-horizontal" id="templateBuilderForm">
+                                <div class="form-group">
+                                    <label class="col-md-4 control-label" for="template_name">Template Name</label>
+                                    <div class="col-md-8">
+                                        <input id="template_name" name="template_name" type="text" 
+                                               class="form-control" 
+                                               ng-model="templateBuilder.form.name"
+                                               placeholder="e.g. My Custom Response"
+                                               ng-disabled="templateBuilder.editing">
+                                        <small class="help-block" ng-if="templateBuilder.editing">Template name cannot be changed</small>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="col-md-4 control-label" for="template_status">Status Code</label>
+                                    <div class="col-md-8">
+                                        <input id="template_status" name="template_status" type="number" 
+                                               class="form-control" 
+                                               ng-model="templateBuilder.form.status"
+                                               placeholder="200" min="100" max="599">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="col-md-4 control-label" for="template_content_type">Content Type</label>
+                                    <div class="col-md-8">
+                                        <input id="template_content_type" name="template_content_type" type="text" 
+                                               class="form-control" 
+                                               ng-model="templateBuilder.form.contentType"
+                                               placeholder="application/json">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="col-md-4 control-label" for="template_content">Response Body</label>
+                                    <div class="col-md-8">
+                                        <textarea id="template_content" name="template_content" 
+                                                  class="form-control" 
+                                                  rows="8"
+                                                  ng-model="templateBuilder.form.content"
+                                                  placeholder='{"status": "success"}'></textarea>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <div class="col-md-offset-4 col-md-8">
+                                        <button type="button" class="btn btn-primary" ng-click="saveTemplate()">
+                                            <span class="glyphicon glyphicon-floppy-disk"></span> 
+                                            {{ templateBuilder.editing ? 'Update' : 'Save' }} Template
+                                        </button>
+                                        <button type="button" class="btn btn-default" ng-click="cancelEditTemplate()" ng-if="templateBuilder.editing">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <h5>Custom Templates</h5>
+                                    <button type="button" class="btn btn-xs btn-info" ng-click="migrateBuiltInTemplates()" style="margin-bottom: 10px;">
+                                        <span class="glyphicon glyphicon-import"></span> Migrate All Built-in Templates
+                                    </button>
+                                </div>
+                            </div>
+                            <div ng-if="Object.keys(customTemplates).length === 0" class="alert alert-info">
+                                <p>No custom templates yet. Create one using the form on the left, or migrate built-in templates to make them editable.</p>
+                            </div>
+                            <div class="list-group" ng-if="Object.keys(customTemplates).length > 0">
+                                <div class="list-group-item" ng-repeat="(key, template) in customTemplates">
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <h5 class="list-group-item-heading">
+                                                {{ template.name || (key.replace(/_/g, ' ').replace(/\b\w/g, function(l){return l.toUpperCase()})) }}
+                                            </h5>
+                                            <p class="list-group-item-text">
+                                                <span class="label label-info">{{ template.status }}</span>
+                                                <span class="label label-default">{{ template.contentType }}</span>
+                                            </p>
+                                        </div>
+                                        <div class="col-md-4 text-right">
+                                            <button type="button" class="btn btn-xs btn-primary" ng-click="editTemplate(key)">
+                                                <span class="glyphicon glyphicon-edit"></span> Edit
+                                            </button>
+                                            <button type="button" class="btn btn-xs btn-danger" ng-click="deleteTemplate(key)">
+                                                <span class="glyphicon glyphicon-trash"></span> Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <h5>Built-in Templates</h5>
+                                    <p class="small text-muted">Built-in templates cannot be edited. Migrate them to make them editable.</p>
+                                    <div class="list-group">
+                                        <div class="list-group-item" ng-repeat="(key, template) in responseTemplates" ng-if="template.builtIn">
+                                            <div class="row">
+                                                <div class="col-md-8">
+                                                    <h5 class="list-group-item-heading">
+                                                        {{ template.name || (key.replace(/_/g, ' ').replace(/\b\w/g, function(l){return l.toUpperCase()})) }}
+                                                        <span class="label label-default">Built-in</span>
+                                                    </h5>
+                                                    <p class="list-group-item-text">
+                                                        <span class="label label-info">{{ template.status }}</span>
+                                                        <span class="label label-default">{{ template.contentType }}</span>
+                                                    </p>
+                                                </div>
+                                                <div class="col-md-4 text-right">
+                                                    <button type="button" class="btn btn-xs btn-success" ng-click="migrateSingleTemplate(key)">
+                                                        <span class="glyphicon glyphicon-import"></span> Migrate
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
                 </div>
             </div><!-- /.modal-content -->
         </div><!-- /.modal-dialog -->

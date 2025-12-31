@@ -36,11 +36,7 @@ class TokenStore implements \App\Storage\TokenStore
         }
 
         $token = new Token(json_decode($result, true));
-        $expiry = isset($token->expiry) && $token->expiry !== null 
-            ? $token->expiry 
-            : config('app.expiry');
-        
-        $this->redis->expire(Token::getIdentifier($tokenId), $expiry);
+        $this->redis->expire(Token::getIdentifier($tokenId), $token->getExpiry());
 
         return $token;
     }
@@ -60,11 +56,11 @@ class TokenStore implements \App\Storage\TokenStore
      */
     public function store(Token $token)
     {
-        $expiry = isset($token->expiry) && $token->expiry !== null 
-            ? $token->expiry 
-            : config('app.expiry');
-        
-        $this->redis->setex(Token::getIdentifier($token->uuid), $expiry, json_encode($token->attributes()));
+        $this->redis->setex(
+            Token::getIdentifier($token->uuid),
+            $token->getExpiry(),
+            json_encode($token->attributes())
+        );
 
         return $token;
     }

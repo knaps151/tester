@@ -18,6 +18,30 @@ class Token extends Entity
     }
 
     /**
+     * Get the expiry time for this token, falling back to default config if not set.
+     *
+     * @return int
+     */
+    public function getExpiry()
+    {
+        return isset($this->expiry) && $this->expiry !== null
+            ? (int)$this->expiry
+            : config('app.expiry');
+    }
+
+    /**
+     * Get the max requests limit for this token, falling back to default config if not set.
+     *
+     * @return int
+     */
+    public function getMaxRequests()
+    {
+        return isset($this->max_requests) && $this->max_requests !== null
+            ? (int)$this->max_requests
+            : config('app.max_requests');
+    }
+
+    /**
      * @param CreateTokenRequest $request
      * @return Token
      */
